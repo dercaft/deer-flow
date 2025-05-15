@@ -14,6 +14,7 @@ from .nodes import (
     coder_node,
     human_feedback_node,
     background_investigation_node,
+    answer_node,
 )
 
 
@@ -24,12 +25,13 @@ def _build_base_graph():
     builder.add_node("coordinator", coordinator_node)
     builder.add_node("background_investigator", background_investigation_node)
     builder.add_node("planner", planner_node)
+    builder.add_node("answerer", answer_node)
     builder.add_node("reporter", reporter_node)
     builder.add_node("research_team", research_team_node)
     builder.add_node("researcher", researcher_node)
     builder.add_node("coder", coder_node)
     builder.add_node("human_feedback", human_feedback_node)
-    builder.add_edge("reporter", END)
+    builder.add_edge("answerer", END)
     return builder
 
 
@@ -49,6 +51,5 @@ def build_graph():
     # build state graph
     builder = _build_base_graph()
     return builder.compile()
-
 
 graph = build_graph()

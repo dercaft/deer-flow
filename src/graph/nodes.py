@@ -31,7 +31,7 @@ from .types import State
 from ..config import SEARCH_MAX_RESULTS, SELECTED_SEARCH_ENGINE, SearchEngine
 
 logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.INFO)
 
 @tool
 def handoff_to_planner(
@@ -242,7 +242,7 @@ def coordinator_node(
     )
 
 
-def reporter_node(state: State):
+def reporter_node(state: State) -> Command[Literal["answerer"]]:
     """Reporter node that write a final report."""
     logger.info("Reporter write final report")
     current_plan = state.get("current_plan")
@@ -277,8 +277,48 @@ def reporter_node(state: State):
     response_content = response.content
     logger.info(f"reporter response: {response_content}")
 
-    return {"final_report": response_content}
+    return Command(
+        update={"final_report": response_content},
+        goto="answerer",
+    )
 
+def answer_node(state: State):
+    """Answer node that answer the question."""
+    logger.info("Answer node is answering the question.")
+    # get the question from the state
+    question = state.get("question")
+    final_report = state.get("final_report")
+    
+    invoke_messages = [
+        HumanMessage(
+            content=f"I have a report on a topic and need to answer a specific question based on it.\n\n"
+                    f"# Question\n{question}\n\n"
+                    f"# Report\n{final_report}\n\n"
+                    f"Please make a final answer of the original task based on our conversation.\n"
+                    f"Please pay special attention to the format in which the answer is presented.\n"
+                    f"You should first analyze the answer format required by the question and then output the final answer that meets the format requirements.\n"
+                    f"Your response should include the following content:\n"
+                    f"- `analysis`: enclosed by <analysis> </analysis>, a detailed analysis of the reasoning result.\n"
+                    f"- `final_answer`: enclosed by <final_answer> </final_answer>, the final answer to the question.\n\n"
+                    f"Here are some hint about the final answer:\n"
+                    f"Your final answer must be output exactly in the format specified by the question. It should be a number OR as few words as possible OR a comma separated list of numbers and/or strings:\n"
+                    f"- If you are asked for a number, don't use comma to write your number neither use units such as $ or percent sign unless specified otherwise.\n"
+                    f"- If you are asked for a string, don't use articles, neither abbreviations (e.g. for cities), and write the digits in plain text unless specified otherwise.\n"
+                    f"- If you are asked for a comma separated list, apply the above rules depending of whether the element to be put in the list is a number or a string.\n"
+                    f"Extract only the relevant information from the report to answer the question directly."
+        )
+    ]
+    
+    logger.debug(f"Answer node invoke messages: {invoke_messages}")
+    response = get_llm_by_type(AGENT_LLM_MAP["answerer"]).invoke(invoke_messages)
+    logger.info(f"Answer node response generated")
+    raw_answer = response.content
+    logger.info(f"Answer node response: {raw_answer}")
+    # Update the state with the raw answer
+    state["raw_answer"] = raw_answer
+    state["chat_history"] = []
+    state["token_info"] = {}
+    return {"raw_answer": raw_answer, "chat_history": [], "token_info": {}}
 
 def research_team_node(
     state: State,

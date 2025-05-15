@@ -1,3 +1,8 @@
+## GAIA specific
+gaia/data/
+gaia/results/
+gaia/logs/
+
 # Python-generated files
 __pycache__/
 *.py[oc]
