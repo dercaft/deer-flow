@@ -21,6 +21,8 @@ logger.setLevel(logging.INFO)  # Logger 自身的最低级别，INFO 及以上�
 
 from .common import extract_pattern
 
+from src.graph.builder import build_graph, build_graph_with_memory
+
 class GAIABenchmark(BaseBenchmark):
     r"""GAIA Benchmark adapted from `"GAIA: a benchmark for General AI
     Assistants"
@@ -131,7 +133,7 @@ class GAIABenchmark(BaseBenchmark):
     async def run(
         self,
         # TODO: Change to deer-flow parameters
-        run_agent_workflow_sync_with_graph: Callable, # async
+        run_agent_workflow_async: Callable, # async
         on: Literal["valid", "test"],
         level: Union[int, List[int], Literal["all"]],
         randomize: bool = False,
@@ -214,13 +216,11 @@ class GAIABenchmark(BaseBenchmark):
                         'task_prompt': task['Question'],
                         'with_task_specify': False,
                     }
-                # TODO: Change to deer-flow
-                raw_answer, chat_history, token_info = await run_agent_workflow_sync_with_graph(
+                graph = build_graph_with_memory()
+                raw_answer, chat_history, token_info = await run_agent_workflow_async(
                         user_input=task['Question'],
+                        graph=graph,
                     )
-                logger.info(f"## Raw answer: {raw_answer}")
-                logger.info(f"## Chat history: {chat_history}")
-                logger.info(f"## Token info: {token_info}")
                 try:
                     answer = extract_pattern(raw_answer, "final_answer")
                 except Exception as e:
@@ -241,7 +241,12 @@ class GAIABenchmark(BaseBenchmark):
                 }
                 self._results.append(_result_info)
 
-
+                # Print summary at the end of the task
+                middle_summary = self._generate_summary()
+                correct = middle_summary["correct"]
+                total = middle_summary["total"]
+                accuracy = correct / total
+                logger.info(f"## Middle Summary: {correct}/{total} = {accuracy}")
             except Exception as e:
                 logger.error(f"Error in processing task: {e}")
                 

@@ -32,6 +32,8 @@ dependencies = [
     "arxiv>=2.2.0",
     "mcp>=1.6.0",
     "langchain-mcp-adapters>=0.0.9",
+    "geopy>=2.4.1",
+    "uszipcode>=1.0.1",
 ]
 
 [project.optional-dependencies]

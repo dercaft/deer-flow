@@ -52,4 +52,4 @@ def build_graph():
     builder = _build_base_graph()
     return builder.compile()
 
-graph = build_graph()
+# graph = build_graph()

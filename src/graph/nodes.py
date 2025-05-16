@@ -109,17 +109,20 @@ def planner_node(
     # if the plan iterations is greater than the max plan iterations, return the reporter node
     if plan_iterations >= configurable.max_plan_iterations:
         return Command(goto="reporter")
-
-    full_response = ""
-    if AGENT_LLM_MAP["planner"] == "basic":
-        response = llm.invoke(messages)
-        full_response = response.model_dump_json(indent=4, exclude_none=True)
-    else:
-        response = llm.stream(messages)
-        for chunk in response:
-            full_response += chunk.content
-    logger.debug(f"Current state messages: {state['messages']}")
-    logger.info(f"Planner response: {full_response}")
+    try:
+        full_response = ""
+        if AGENT_LLM_MAP["planner"] == "basic":
+            response = llm.invoke(messages)
+            full_response = response.model_dump_json(indent=4, exclude_none=True)
+        else:
+            response = llm.stream(messages)
+            for chunk in response:
+                full_response += chunk.content
+        logger.debug(f"Current state messages: {state['messages']}")
+        logger.info(f"Planner response: {full_response}")
+    except Exception as e:
+        logger.error(f"Error in planner node LLM invoke: {e}")
+        return Command(goto="reporter")
 
     try:
         curr_plan = json.loads(repair_json_output(full_response))
@@ -206,12 +209,16 @@ def coordinator_node(
     """Coordinator node that communicate with customers."""
     logger.info("Coordinator talking.")
     messages = apply_prompt_template("coordinator", state)
-    response = (
-        get_llm_by_type(AGENT_LLM_MAP["coordinator"])
-        .bind_tools([handoff_to_planner])
-        .invoke(messages)
-    )
-    logger.debug(f"Current state messages: {state['messages']}")
+    try:
+        response = (
+            get_llm_by_type(AGENT_LLM_MAP["coordinator"])
+            .bind_tools([handoff_to_planner])
+            .invoke(messages)
+        )
+        logger.debug(f"Current state messages: {state['messages']}")
+    except Exception as e:
+        logger.error(f"Error in coordinator node LLM invoke: {e}")
+        return Command(goto="reporter")
 
     goto = "__end__"
     locale = state.get("locale", "en-US")  # Default locale if not specified
@@ -273,9 +280,13 @@ def reporter_node(state: State) -> Command[Literal["answerer"]]:
             )
         )
     logger.debug(f"Current invoke messages: {invoke_messages}")
-    response = get_llm_by_type(AGENT_LLM_MAP["reporter"]).invoke(invoke_messages)
-    response_content = response.content
-    logger.info(f"reporter response: {response_content}")
+    try:
+        response = get_llm_by_type(AGENT_LLM_MAP["reporter"]).invoke(invoke_messages)
+        response_content = response.content
+        logger.info(f"reporter response: {response_content}")
+    except Exception as e:
+        logger.error(f"Error in reporter node LLM invoke: {e}")
+        return Command(goto="answerer")
 
     return Command(
         update={"final_report": response_content},
@@ -310,15 +321,19 @@ def answer_node(state: State):
     ]
     
     logger.debug(f"Answer node invoke messages: {invoke_messages}")
-    response = get_llm_by_type(AGENT_LLM_MAP["answerer"]).invoke(invoke_messages)
-    logger.info(f"Answer node response generated")
-    raw_answer = response.content
-    logger.info(f"Answer node response: {raw_answer}")
-    # Update the state with the raw answer
-    state["raw_answer"] = raw_answer
-    state["chat_history"] = []
-    state["token_info"] = {}
-    return {"raw_answer": raw_answer, "chat_history": [], "token_info": {}}
+    try:
+        response = get_llm_by_type(AGENT_LLM_MAP["answerer"]).invoke(invoke_messages)
+        logger.info(f"Answer node response generated")
+        raw_answer = response.content
+        logger.info(f"Answer node response: {raw_answer}")
+        # Update the state with the raw answer
+        state["raw_answer"] = raw_answer
+        state["chat_history"] = []
+        state["token_info"] = {}
+        return state
+    except Exception as e:
+        logger.error(f"Error in answer node LLM invoke: {e}")
+        return state
 
 def research_team_node(
     state: State,
