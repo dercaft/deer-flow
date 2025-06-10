@@ -253,10 +253,11 @@ def reporter_node(state: State) -> Command[Literal["answerer"]]:
     """Reporter node that write a final report."""
     logger.info("Reporter write final report")
     current_plan = state.get("current_plan")
+    question = state.get("question")
     input_ = {
         "messages": [
             HumanMessage(
-                f"# Research Requirements\n\n## Task\n\n{current_plan.title}\n\n## Description\n\n{current_plan.thought}"
+                f"# Research Requirements\n\n## Task\n\n{current_plan.title}\n\n## Description\n\n{current_plan.thought}\n\n## Question\n\n{question}"
             )
         ],
         "locale": state.get("locale", "en-US"),
@@ -302,21 +303,31 @@ def answer_node(state: State):
     
     invoke_messages = [
         HumanMessage(
-            content=f"I have a report on a topic and need to answer a specific question based on it.\n\n"
-                    f"# Question\n{question}\n\n"
-                    f"# Report\n{final_report}\n\n"
-                    f"Please make a final answer of the original task based on our conversation.\n"
-                    f"Please pay special attention to the format in which the answer is presented.\n"
-                    f"You should first analyze the answer format required by the question and then output the final answer that meets the format requirements.\n"
-                    f"Your response should include the following content:\n"
-                    f"- `analysis`: enclosed by <analysis> </analysis>, a detailed analysis of the reasoning result.\n"
-                    f"- `final_answer`: enclosed by <final_answer> </final_answer>, the final answer to the question.\n\n"
-                    f"Here are some hint about the final answer:\n"
-                    f"Your final answer must be output exactly in the format specified by the question. It should be a number OR as few words as possible OR a comma separated list of numbers and/or strings:\n"
-                    f"- If you are asked for a number, don't use comma to write your number neither use units such as $ or percent sign unless specified otherwise.\n"
-                    f"- If you are asked for a string, don't use articles, neither abbreviations (e.g. for cities), and write the digits in plain text unless specified otherwise.\n"
-                    f"- If you are asked for a comma separated list, apply the above rules depending of whether the element to be put in the list is a number or a string.\n"
-                    f"Extract only the relevant information from the report to answer the question directly."
+            content=f"""
+I have a report on a topic and need to answer a specific question based on it.
+
+# Question
+{question}
+
+# Report
+{final_report}
+
+Please make a final answer of the original task based on our conversation.
+Please pay special attention to the format in which the answer is presented.
+You should first analyze the answer format required by the question and then output the final answer that meets the format requirements.
+
+Your response should include the following content:
+- `analysis`: enclosed by <analysis> </analysis>, a detailed analysis of the reasoning result.
+- `final_answer`: enclosed by <final_answer> </final_answer>, the final answer to the question.
+
+Here are some hints about the final answer:
+Your final answer must be output exactly in the format specified by the question. It should be a number OR as few words as possible OR a comma separated list of numbers and/or strings:
+- If you are asked for a number, don't use commas to write your number and don't use units such as $ or percent sign unless specified otherwise.
+- If you are asked for a string, don't use articles or abbreviations (e.g. for cities), and write the digits in plain text unless specified otherwise.
+- If you are asked for a comma separated list, apply the above rules depending on whether the element to be put in the list is a number or a string.
+
+Extract relevant information from the report to answer the question directly. If the answer is not clearly stated in the report or some information is uncertain, make your best educated guess based on the available information in the report. Do not leave questions unanswered - provide your most reasonable estimate when exact information is not available.
+            """
         )
     ]
     
@@ -361,7 +372,7 @@ async def _execute_agent_step(
     """Helper function to execute a step using the specified agent."""
     current_plan = state.get("current_plan")
     observations = state.get("observations", [])
-
+    question = state.get("question")
     # Find the first unexecuted step
     for step in current_plan.steps:
         if not step.execution_res:
@@ -373,7 +384,7 @@ async def _execute_agent_step(
     agent_input = {
         "messages": [
             HumanMessage(
-                content=f"#Task\n\n##title\n\n{step.title}\n\n##description\n\n{step.description}\n\n##locale\n\n{state.get('locale', 'en-US')}"
+                content=f"#Task\n\n##title\n\n{step.title}\n\n##description\n\n{step.description}\n\n##locale\n\n{state.get('locale', 'en-US')}\n\n##question\n\n{question}"
             )
         ]
     }
@@ -388,6 +399,7 @@ async def _execute_agent_step(
         )
 
     # Invoke the agent
+    logger.debug(f"{agent_name.capitalize()} full input: {agent_input}")
     result = await agent.ainvoke(input=agent_input)
 
     # Process the result
@@ -465,6 +477,7 @@ async def _setup_and_execute_agent_step(
                         f"Powered by '{enabled_tools[tool.name]}'.\n{tool.description}"
                     )
                     loaded_tools.append(tool)
+                logger.debug(f"From MCP server {server_name}: {tool.name} Loaded? {tool.name in enabled_tools}")
             agent = create_agent(agent_type, agent_type, loaded_tools, agent_type)
             return await _execute_agent_step(state, agent, agent_type)
     else:

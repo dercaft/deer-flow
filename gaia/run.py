@@ -75,7 +75,7 @@ logger.setLevel(logging.INFO)  # Logger 自身的最低级别，INFO 及以上�
 
 async def run_agent_workflow_async(
     graph: Graph,
-    user_input: str,
+    user_input: dict,  # should be format in dict: {"question": task['Question'], "file_name": task['file_name']}
     debug: bool = False,
     max_plan_iterations: int = 1,
     max_step_num: int = 3,
@@ -84,7 +84,9 @@ async def run_agent_workflow_async(
     """Run the agent workflow asynchronously with the given user input.
 
     Args:
-        user_input: The user's query or request
+        user_input: Dict with keys "question" and "file_name"
+            "question": str, the question to be answered
+            "file_name": str, the absolute path of the file to be used for the task
         debug: If True, enables debug level logging
         max_plan_iterations: Maximum number of plan iterations
         max_step_num: Maximum number of steps in a plan
@@ -102,8 +104,9 @@ async def run_agent_workflow_async(
     logger.info(f"Starting async workflow with user input: {user_input}")
     initial_state = {
         # Runtime Variables
-        "messages": [{"role": "user", "content": user_input}],
-        "question": user_input,
+        "messages": [{"role": "user", "content": user_input["question"]}],
+        "question": user_input["question"],
+        "file_name": user_input["file_name"],
         "auto_accepted_plan": True,
         "enable_background_investigation": enable_background_investigation,
     }
@@ -112,6 +115,48 @@ async def run_agent_workflow_async(
             "thread_id": "default",
             "max_plan_iterations": max_plan_iterations,
             "max_step_num": max_step_num,
+            "mcp_settings": {
+                "servers": {
+                    "markitdown": {
+                        "transport": "sse",
+                        "url": "http://localhost:3001/sse",
+                        "enabled_tools": ["convert_to_markdown"], # Update 0519
+                        "add_to_agents": ["researcher", "coder"],
+                    },
+                    # "playwright-mcp": {
+                    #     "transport": "sse",
+                    #     "url": "http://localhost:8931/sse",
+                    #     "enabled_tools": [
+                    #         "browser_close",
+                    #         "browser_resize",
+                    #         "browser_console_messages",
+                    #         "browser_handle_dialog",
+                    #         "browser_file_upload",
+                    #         "browser_install",
+                    #         "browser_press_key",
+                    #         "browser_navigate",
+                    #         "browser_navigate_back",
+                    #         "browser_navigate_forward",
+                    #         "browser_network_requests",
+                    #         "browser_pdf_save",
+                    #         "browser_take_screenshot",
+                    #         "browser_snapshot",
+                    #         "browser_click",
+                    #         "browser_drag",
+                    #         "browser_hover",
+                    #         "browser_type",
+                    #         "browser_select_option",
+                    #         "browser_tab_list",
+                    #         "browser_tab_new",
+                    #         "browser_tab_select",
+                    #         "browser_tab_close",
+                    #         "browser_generate_playwright_test",
+                    #         "browser_wait_for"
+                    #     ],
+                    #     "add_to_agents": ["researcher", "coder"]
+                    # }
+                }
+            },
         },
         "recursion_limit": 100,
     }
@@ -123,36 +168,6 @@ async def run_agent_workflow_async(
     output=await graph.ainvoke(initial_state, config, stream_mode="values")
     print(output)
     raw_answer, chat_history, token_info=output["raw_answer"], output["chat_history"], output["token_info"]
-    # async for s in graph.astream(
-    #     input=initial_state, config=config, stream_mode="values"
-    # ):
-    #     try:
-    #         logger.info(f"Stream output: {type(s)}")
-    #             # Store the final state for extraction later
-    #         s = s
-    #         logger.info(f"State: {s}")
-    #         # Process message updates
-    #         if "messages" in s:
-    #             if len(s["messages"]) <= last_message_cnt:
-    #                 continue
-    #             last_message_cnt = len(s["messages"])
-    #             message = s["messages"][-1]
-    #             if isinstance(message, tuple):
-    #                 print(message)
-    #             else:
-    #                 message.pretty_print()
-    #         raw_answer = s.get("raw_answer", None)
-    #         chat_history = s.get("chat_history", None)
-    #         token_info = s.get("token_info", None)
-    #         logger.info(f"Output: {s}")
-
-    #     except Exception as e:
-    #         logger.error(f"Error processing stream output: {e}")
-    #         print(f"Error processing output: {str(e)}")
-
-    # logger.info("Async workflow completed successfully")
-    # logger.info(f"Raw answer: {raw_answer}")
-    # check if return value exists
     if raw_answer is None:
         logger.error("Raw answer is None")
         return None, None, None
@@ -184,6 +199,7 @@ async def main():
     parser.add_argument("--level", type=str, default="all", help="Level(s) to test")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
     parser.add_argument("--idx", type=int, default=-1, help="Index to run")
+    parser.add_argument("--task_id", type=str, default="", help="task ID to run")
     parser.add_argument("--save_result", action="store_true", help="Save results")
     parser.add_argument(
         "--log_path", type=str, default=default_log_path, help="Log file path"
@@ -227,6 +243,7 @@ async def main():
         level=args.level,
         idx=[args.idx] if args.idx > -1 else None,  # Only run index 1
         save_result=args.save_result,
+        task_id=args.task_id,
     )
 
     print(f"Benchmark results: {result}")

@@ -68,12 +68,25 @@ async def run_agent_workflow_async(
                         "args": ["mcp-github-trending"],
                         "enabled_tools": ["get_github_trending_repositories"],
                         "add_to_agents": ["researcher"],
+                    },
+                    "markitdown": {
+                        "transport": "sse",
+                        "url": "http://localhost:3001/sse",
+                        "enabled_tools": ["convert_to_markdown"],
+                        "add_to_agents": ["researcher", "coder"],
+                    },
+                    "playwright-mcp": {
+                        "transport": "sse",
+                        "url": "http://localhost:8931/sse",
+                        "enabled_tools": ["browser_navigate", "browser_snapshot", "browser_click", "browser_type", "browser_take_screenshot"],
+                        "add_to_agents": ["researcher", "coder"],
                     }
                 }
             },
         },
         "recursion_limit": 100,
     }
+
     last_message_cnt = 0
     async for s in graph.astream(
         input=initial_state, config=config, stream_mode="values"

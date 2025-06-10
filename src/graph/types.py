@@ -22,6 +22,7 @@ class State(MessagesState):
     enable_background_investigation: bool = True
     background_investigation_results: str = None
     question:str = ""
+    file_name:str = ""
     raw_answer:str = ""
     chat_history:list[str] = []
     token_info:dict = {}

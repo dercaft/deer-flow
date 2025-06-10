@@ -50,8 +50,7 @@ class GAIABenchmark(BaseBenchmark):
                 parallel processing. (default: :obj:`1`)
         """
         super().__init__("gaia", data_dir, save_to, processes)
-
-
+        self.data_dir = Path(data_dir)
     def download(self):
         r"""Download the GAIA dataset."""
         from huggingface_hub import snapshot_download
@@ -139,6 +138,7 @@ class GAIABenchmark(BaseBenchmark):
         randomize: bool = False,
         subset: Optional[int] = None,
         idx: Optional[List[int]] = None,
+        task_id: str = "",
         save_result: bool = False,
     ) -> Dict[str, Any]:
 
@@ -164,6 +164,10 @@ class GAIABenchmark(BaseBenchmark):
             )
         logger.info(f"Running benchmark on {on} set at levels {levels}.")
         datas = [data for data in self._data[on] if data["Level"] in levels]
+        if task_id:
+            datas = [data for data in datas if data["task_id"] == task_id]
+            if len(datas) == 0:
+                raise ValueError(f"Task ID {task_id} not found in {on} set.")
         # Shuffle and subset data if necessary
         if randomize:
             random.shuffle(datas)
@@ -211,14 +215,11 @@ class GAIABenchmark(BaseBenchmark):
                 logger.info(f"Task Question: {task['Question']}")
                 logger.info(f"Required tools: {task['Annotator Metadata']['Tools']}")
 
-
-                task_kwargs = {
-                        'task_prompt': task['Question'],
-                        'with_task_specify': False,
-                    }
+                if task['file_name']:
+                    task['file_name'] = str(self.data_dir/ "2023" / on / task['file_name'])
                 graph = build_graph_with_memory()
                 raw_answer, chat_history, token_info = await run_agent_workflow_async(
-                        user_input=task['Question'],
+                        user_input={"question": task['Question'], "file_name": task['file_name']},
                         graph=graph,
                     )
                 try:

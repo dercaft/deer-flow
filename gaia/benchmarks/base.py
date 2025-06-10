@@ -130,7 +130,7 @@ class BaseBenchmark(ABC):
         r"""Run the benchmark.
 
         Args:
-            agent (ChatAgent): The chat agent.
+            agent : The chat agent.
             on (str): The data split to run the benchmark on.
             randomize (bool): Whether to randomize the data.
             subset (int): The subset of the data to run the benchmark on.
