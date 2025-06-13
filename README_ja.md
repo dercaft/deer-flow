@@ -3,7 +3,7 @@
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[English](./README.md) | [简体中文](./README_zh.md) | [日本語](./README_ja.md) | [Deutsch](./README_de.md)
+[English](./README.md) | [简体中文](./README_zh.md) | [日本語](./README_ja.md) | [Deutsch](./README_de.md) | [Español](./README_es.md) | [Русский](./README_ru.md) | [Portuguese](./README_pt.md)
 
 > オープンソースから生まれ、オープンソースに還元する。
 
@@ -321,6 +321,25 @@ Studio UI で研究トピックを送信すると、次を含む全ワークフ�
 - 計画を修正できるフィードバックループ
 - 各セクションの研究と執筆段階
 - 最終レポート生成
+
+### LangSmith トレースの有効化
+
+DeerFlow は LangSmith トレース機能をサポートしており、ワークフローのデバッグとモニタリングに役立ちます。LangSmith トレースを有効にするには：
+
+1. `.env` ファイルに次の設定があることを確認してください（`.env.example` を参照）：
+   ```bash
+   LANGSMITH_TRACING=true
+   LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
+   LANGSMITH_API_KEY="xxx"
+   LANGSMITH_PROJECT="xxx"
+   ```
+
+2. 次のコマンドを実行して LangSmith トレースを開始します：
+   ```bash
+   langgraph dev
+   ```
+
+これにより、LangGraph Studio でトレース可視化が有効になり、トレースがモニタリングと分析のために LangSmith に送信されます。
 
 ## Docker
 
